@@ -1,0 +1,23 @@
+*.o
+*.cmd
+*.ko
+*.cm
+Module.symvers
+modules.order
+*.mod.c
+.tmp_versions
+.cache.mk
+*.mod
+*.o.d
+*.c.orig 
+
+# build artifacts
+*.o
+*.ko
+*.ko.xz
+*.mod
+*.mod.c
+*.cmd
+*.order
+*.symvers
+.tmp_versions/

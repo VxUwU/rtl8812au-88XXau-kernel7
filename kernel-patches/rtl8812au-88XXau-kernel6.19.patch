@@ -1,0 +1,120 @@
+### 1. Makefile: EXTRA_CFLAGS -> ccflags-y (kbuild 6.19 removed EXTRA_CFLAGS)
+--- Makefile.orig	2026-09-08 01:07:06.913789036 +0700
++++ Makefile	2026-09-08 01:07:06.916332933 +0700
+@@ -1,26 +1,26 @@
+-EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS) -fno-pie
+-EXTRA_CFLAGS += -O3
+-EXTRA_CFLAGS += -Wno-unused-variable
+-#EXTRA_CFLAGS += -Wno-unused-value
+-EXTRA_CFLAGS += -Wno-unused-label
+-#EXTRA_CFLAGS += -Wno-unused-parameter
+-EXTRA_CFLAGS += -Wno-unused-function
+-EXTRA_CFLAGS += -Wno-implicit-fallthrough
+-EXTRA_CFLAGS += -Wno-cast-function-type
+-EXTRA_CFLAGS += -Wno-missing-declarations
+-EXTRA_CFLAGS += -Wno-missing-prototypes
+-#EXTRA_CFLAGS += -Wno-error=cast-function-type
+-#EXTRA_CFLAGS += -Wno-parentheses-equality
+-#EXTRA_CFLAGS += -Wno-error=incompatible-pointer-types
+-EXTRA_CFLAGS += -Wno-stringop-overread
+-#EXTRA_CFLAGS += -Wno-pointer-bool-conversion
+-EXTRA_CFLAGS += -Wno-unknown-pragmas
+-#EXTRA_CFLAGS += -Wno-unused
+-EXTRA_CFLAGS += -Wno-address
+-EXTRA_CFLAGS += -Wno-vla -g
++ccflags-y += $(USER_EXTRA_CFLAGS) -fno-pie
++ccflags-y += -O3
++ccflags-y += -Wno-unused-variable
++#ccflags-y += -Wno-unused-value
++ccflags-y += -Wno-unused-label
++#ccflags-y += -Wno-unused-parameter
++ccflags-y += -Wno-unused-function
++ccflags-y += -Wno-implicit-fallthrough
++ccflags-y += -Wno-cast-function-type
++ccflags-y += -Wno-missing-declarations
++ccflags-y += -Wno-missing-prototypes
++#ccflags-y += -Wno-error=cast-function-type
++#ccflags-y += -Wno-parentheses-equality
++#ccflags-y += -Wno-error=incompatible-pointer-types
++ccflags-y += -Wno-stringop-overread
++#ccflags-y += -Wno-pointer-bool-conversion
++ccflags-y += -Wno-unknown-pragmas
++#ccflags-y += -Wno-unused
++ccflags-y += -Wno-address
++ccflags-y += -Wno-vla -g
+ 
+-EXTRA_CFLAGS += -I$(src)/include -I$(srctree)/$(src)/include
+-EXTRA_CFLAGS += -I$(src)/hal/phydm -I$(srctree)/$(src)/hal/phydm
++ccflags-y += -I$(src)/include -I$(srctree)/$(src)/include
++ccflags-y += -I$(src)/hal/phydm -I$(srctree)/$(src)/hal/phydm
+ EXTRA_LDFLAGS += --strip-debug -O3
+ 
+ ########################## WIFI IC ############################
+@@ -189,12 +189,12 @@
+ 
+ ifeq ($(CONFIG_RTL8812A)_$(CONFIG_RTL8821A)_$(CONFIG_RTL8814A), y_y_y)
+ 
+-EXTRA_CFLAGS += -DDRV_NAME=\"rtl88XXau\"
++ccflags-y += -DDRV_NAME=\"rtl88XXau\"
+ ifeq ($(CONFIG_USB_HCI), y)
+ USER_MODULE_NAME = 88XXau
+ endif
+
+### 2. include/osdep_service_linux.h: kernel 6.16 timer API rename compat
+--- include/osdep_service_linux.h.orig	2026-09-08 01:09:21.823384400 +0700
++++ include/osdep_service_linux.h	2026-09-08 01:09:21.856392637 +0700
+@@ -349,6 +349,17 @@
+ 	return &(queue->queue);
+ }
+ 
++/* --- kernel 6.16 timer API rename compat (added for 6.19 build) --- */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0))
++#ifndef from_timer
++#define from_timer(var, cb_timer, fieldname) timer_container_of(var, cb_timer, fieldname)
++#endif
++#ifndef del_timer_sync
++#define del_timer_sync(t) timer_delete_sync(t)
++#endif
++#endif
++/* --------------------------------------------------------------- */
++
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0))
+ static inline void timer_hdl(struct timer_list *in_timer)
+ #else
+
+### 3. os_dep/linux/ioctl_cfg80211.c: cfg80211 ops gained 'int radio_idx' (6.16)
+--- os_dep/linux/ioctl_cfg80211.c.orig	2026-09-08 01:10:31.199870038 +0700
++++ os_dep/linux/ioctl_cfg80211.c	2026-09-08 01:10:31.279555047 +0700
+@@ -3365,7 +3365,11 @@
+ 	return ret;
+ }
+ 
+-static int cfg80211_rtw_set_wiphy_params(struct wiphy *wiphy, u32 changed)
++static int cfg80211_rtw_set_wiphy_params(struct wiphy *wiphy,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
++	int radio_idx,
++#endif
++	u32 changed)
+ {
+ #if 0
+ 	struct iwm_priv *iwm = wiphy_to_iwm(wiphy);
+@@ -4267,6 +4271,9 @@
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+ 	struct wireless_dev *wdev,
+ #endif
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
++	int radio_idx,
++#endif
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)) || defined(COMPAT_KERNEL_RELEASE)
+ 	enum nl80211_tx_power_setting type, int mbm)
+ #else
+@@ -4328,6 +4335,9 @@
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+ 	struct wireless_dev *wdev,
+ #endif
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 16, 0))
++	int radio_idx,
++#endif
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0))
+ 	unsigned int link_id,
+ #endif
